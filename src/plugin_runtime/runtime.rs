@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
 use anyhow::anyhow;
-use rquickjs::{Context, Runtime, Value};
 use rquickjs::promise::MaybePromise;
+use rquickjs::{Context, Runtime, Value};
 use serde::{Deserialize, Serialize};
 
 use super::host_api;
@@ -130,22 +130,20 @@ fn run_probe_inner(
             .map_err(|_| anyhow!("__openusage_ctx not set"))?;
 
         // 5. Call probe(ctx) — result may be a plain object or a Promise
-        let raw_result: Value = probe_fn
-            .call((ctx_arg,))
-            .map_err(|_| {
-                // Extract the actual JS exception message instead of the opaque QuickJS error
-                let exc = ctx.catch();
-                let msg: String = if exc.is_object() {
-                    exc.as_object()
-                        .and_then(|o| o.get::<_, String>("message").ok())
-                        .unwrap_or_else(|| "unknown JS error".to_string())
-                } else {
-                    exc.as_string()
-                        .and_then(|s| s.to_string().ok())
-                        .unwrap_or_else(|| "unknown JS error".to_string())
-                };
-                anyhow!("probe() call failed: {msg}")
-            })?;
+        let raw_result: Value = probe_fn.call((ctx_arg,)).map_err(|_| {
+            // Extract the actual JS exception message instead of the opaque QuickJS error
+            let exc = ctx.catch();
+            let msg: String = if exc.is_object() {
+                exc.as_object()
+                    .and_then(|o| o.get::<_, String>("message").ok())
+                    .unwrap_or_else(|| "unknown JS error".to_string())
+            } else {
+                exc.as_string()
+                    .and_then(|s| s.to_string().ok())
+                    .unwrap_or_else(|| "unknown JS error".to_string())
+            };
+            anyhow!("probe() call failed: {msg}")
+        })?;
 
         // 6. Resolve through MaybePromise::finish — handles both sync and async plugins
         let maybe: MaybePromise = MaybePromise::from_value(raw_result);
@@ -160,7 +158,10 @@ fn run_probe_inner(
 
 /// Extract (MetricLine[], plan) from the probe() result value.
 /// Handles both `{ lines: [...], plan: "..." }` and a bare array `[...]`.
-fn parse_probe_result<'js>(ctx: &rquickjs::Ctx<'js>, value: Value<'js>) -> anyhow::Result<(Vec<MetricLine>, Option<String>)> {
+fn parse_probe_result<'js>(
+    ctx: &rquickjs::Ctx<'js>,
+    value: Value<'js>,
+) -> anyhow::Result<(Vec<MetricLine>, Option<String>)> {
     let json_str = ctx
         .json_stringify(value)
         .map_err(|e| anyhow!("could not JSON-stringify probe result: {e}"))?
@@ -177,7 +178,8 @@ fn parse_probe_result<'js>(ctx: &rquickjs::Ctx<'js>, value: Value<'js>) -> anyho
     // Try { lines: MetricLine[], plan?: string }
     if let Some(lines_val) = obj.get("lines") {
         if let Ok(lines) = serde_json::from_value::<Vec<MetricLine>>(lines_val.clone()) {
-            let plan = obj.get("plan")
+            let plan = obj
+                .get("plan")
                 .and_then(|v| v.as_str())
                 .map(|s| s.to_string());
             return Ok((lines, plan));
@@ -201,15 +203,19 @@ mod tests {
 
     #[test]
     fn mock_plugin_runs() {
-        let plugin_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("bundled_plugins/mock");
+        let plugin_dir =
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("bundled_plugins/mock");
         if !plugin_dir.exists() {
             eprintln!("skipping mock_plugin_runs: bundled_plugins/mock not found");
             return;
         }
         let plugin = load_plugin(&plugin_dir).expect("load mock plugin");
         let output = run_probe(&plugin, &std::env::temp_dir(), "0.1.0");
-        assert!(output.error.is_none(), "mock plugin error: {:?}", output.error);
+        assert!(
+            output.error.is_none(),
+            "mock plugin error: {:?}",
+            output.error
+        );
         assert!(!output.lines.is_empty(), "mock plugin returned no lines");
     }
 }

@@ -1,16 +1,17 @@
 use std::path::PathBuf;
 
-use rquickjs::{
-    Ctx, Function, Object, Value,
-    prelude::Rest,
-};
+use rquickjs::{prelude::Rest, Ctx, Function, Object, Value};
 use serde_json::Value as JsonValue;
 
 /// Inject the full `__openusage_ctx` host API object into the QuickJS context.
 ///
 /// This implements the same contract as robinebers/openusage's plugin_engine/host_api.rs,
 /// minus the Tauri-specific imports. The keychain uses the `keyring` crate directly.
-pub fn inject<'js>(ctx: &Ctx<'js>, plugin_dir: &PathBuf, app_version: &str) -> rquickjs::Result<()> {
+pub fn inject<'js>(
+    ctx: &Ctx<'js>,
+    plugin_dir: &PathBuf,
+    app_version: &str,
+) -> rquickjs::Result<()> {
     let globals = ctx.globals();
 
     // Build the top-level ctx object
@@ -141,39 +142,33 @@ fn inject_http<'js>(ctx: &Ctx<'js>, host: &Object<'js>) -> rquickjs::Result<()> 
 fn inject_keychain<'js>(ctx: &Ctx<'js>, host: &Object<'js>) -> rquickjs::Result<()> {
     let kc_obj = Object::new(ctx.clone())?;
 
-    let read_fn = Function::new(
-        ctx.clone(),
-        move |service: String| -> Option<String> {
-            // On macOS: try the system keychain by service name (how the native app stored it)
-            #[cfg(target_os = "macos")]
-            {
-                let out = std::process::Command::new("security")
-                    .args(["find-generic-password", "-s", &service, "-w"])
-                    .output()
-                    .ok()?;
-                if out.status.success() {
-                    let password = String::from_utf8_lossy(&out.stdout).trim().to_string();
-                    if !password.is_empty() {
-                        return Some(password);
-                    }
+    let read_fn = Function::new(ctx.clone(), move |service: String| -> Option<String> {
+        // On macOS: try the system keychain by service name (how the native app stored it)
+        #[cfg(target_os = "macos")]
+        {
+            let out = std::process::Command::new("security")
+                .args(["find-generic-password", "-s", &service, "-w"])
+                .output()
+                .ok()?;
+            if out.status.success() {
+                let password = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                if !password.is_empty() {
+                    return Some(password);
                 }
             }
-            // Fallback: credentials stored by `au configure`
-            keyring::Entry::new("agentusage", &service)
-                .ok()
-                .and_then(|e| e.get_password().ok())
-        },
-    )?;
+        }
+        // Fallback: credentials stored by `au configure`
+        keyring::Entry::new("agentusage", &service)
+            .ok()
+            .and_then(|e| e.get_password().ok())
+    })?;
 
-    let write_fn = Function::new(
-        ctx.clone(),
-        move |service: String, value: String| -> bool {
-            keyring::Entry::new("agentusage", &service)
-                .ok()
-                .and_then(|e| e.set_password(&value).ok())
-                .is_some()
-        },
-    )?;
+    let write_fn = Function::new(ctx.clone(), move |service: String, value: String| -> bool {
+        keyring::Entry::new("agentusage", &service)
+            .ok()
+            .and_then(|e| e.set_password(&value).ok())
+            .is_some()
+    })?;
 
     kc_obj.set("readGenericPassword", read_fn)?;
     kc_obj.set("writeGenericPassword", write_fn)?;
@@ -184,7 +179,11 @@ fn inject_keychain<'js>(ctx: &Ctx<'js>, host: &Object<'js>) -> rquickjs::Result<
 /// Inject ctx.host.fs
 ///
 /// Sandboxed to the plugin's data directory.
-fn inject_fs<'js>(ctx: &Ctx<'js>, host: &Object<'js>, plugin_dir: &PathBuf) -> rquickjs::Result<()> {
+fn inject_fs<'js>(
+    ctx: &Ctx<'js>,
+    host: &Object<'js>,
+    plugin_dir: &PathBuf,
+) -> rquickjs::Result<()> {
     let fs_obj = Object::new(ctx.clone())?;
     let data_dir = plugin_dir.join("data");
     std::fs::create_dir_all(&data_dir).ok();
@@ -203,7 +202,9 @@ fn inject_fs<'js>(ctx: &Ctx<'js>, host: &Object<'js>, plugin_dir: &PathBuf) -> r
     {
         let dir = data_dir.clone();
         let write_fn = Function::new(ctx.clone(), move |path: String, content: String| -> bool {
-            let Some(rel) = sanitize_path(&path) else { return false; };
+            let Some(rel) = sanitize_path(&path) else {
+                return false;
+            };
             let full = dir.join(rel);
             if let Some(parent) = full.parent() {
                 std::fs::create_dir_all(parent).ok();
@@ -217,7 +218,9 @@ fn inject_fs<'js>(ctx: &Ctx<'js>, host: &Object<'js>, plugin_dir: &PathBuf) -> r
     {
         let dir = data_dir.clone();
         let del_fn = Function::new(ctx.clone(), move |path: String| -> bool {
-            let Some(rel) = sanitize_path(&path) else { return false; };
+            let Some(rel) = sanitize_path(&path) else {
+                return false;
+            };
             std::fs::remove_file(dir.join(rel)).is_ok()
         })?;
         fs_obj.set("deleteFile", del_fn)?;
@@ -227,7 +230,9 @@ fn inject_fs<'js>(ctx: &Ctx<'js>, host: &Object<'js>, plugin_dir: &PathBuf) -> r
     {
         let dir = data_dir.clone();
         let exists_fn = Function::new(ctx.clone(), move |path: String| -> bool {
-            resolve_path(&path, &dir).map(|p| p.exists()).unwrap_or(false)
+            resolve_path(&path, &dir)
+                .map(|p| p.exists())
+                .unwrap_or(false)
         })?;
         fs_obj.set("exists", exists_fn)?;
     }
@@ -244,14 +249,17 @@ fn inject_fs<'js>(ctx: &Ctx<'js>, host: &Object<'js>, plugin_dir: &PathBuf) -> r
     // writeText(relativePath, content) -> bool — sandboxed (relative only)
     {
         let dir = data_dir.clone();
-        let write_text_fn = Function::new(ctx.clone(), move |path: String, content: String| -> bool {
-            let Some(rel) = sanitize_path(&path) else { return false; };
-            let full = dir.join(rel);
-            if let Some(parent) = full.parent() {
-                std::fs::create_dir_all(parent).ok();
-            }
-            std::fs::write(full, content).is_ok()
-        })?;
+        let write_text_fn =
+            Function::new(ctx.clone(), move |path: String, content: String| -> bool {
+                let Some(rel) = sanitize_path(&path) else {
+                    return false;
+                };
+                let full = dir.join(rel);
+                if let Some(parent) = full.parent() {
+                    std::fs::create_dir_all(parent).ok();
+                }
+                std::fs::write(full, content).is_ok()
+            })?;
         fs_obj.set("writeText", write_text_fn)?;
     }
 
@@ -320,7 +328,11 @@ fn sanitize_path(path: &str) -> Option<String> {
 /// Plugins call `sqlite.query(dbPath, sql, params?)` where `dbPath` is "" for the plugin's own
 /// db, "~/.../foo.db" for a home-relative path, or an absolute path for external databases
 /// (e.g. Cursor/Windsurf state.vscdb).
-fn inject_sqlite<'js>(ctx: &Ctx<'js>, host: &Object<'js>, plugin_dir: &PathBuf) -> rquickjs::Result<()> {
+fn inject_sqlite<'js>(
+    ctx: &Ctx<'js>,
+    host: &Object<'js>,
+    plugin_dir: &PathBuf,
+) -> rquickjs::Result<()> {
     let sqlite_obj = Object::new(ctx.clone())?;
     let default_db_path = plugin_dir.join("data").join("plugin.db");
 
@@ -332,9 +344,7 @@ fn inject_sqlite<'js>(ctx: &Ctx<'js>, host: &Object<'js>, plugin_dir: &PathBuf) 
             move |db_path_str: String, sql: String, params_json: Option<String>| -> String {
                 let path = resolve_db_path(&db_path_str, &default_db);
                 let result = sqlite_execute(&path, &sql, params_json.as_deref());
-                result.unwrap_or_else(|e| {
-                    serde_json::json!({"error": e.to_string()}).to_string()
-                })
+                result.unwrap_or_else(|e| serde_json::json!({"error": e.to_string()}).to_string())
             },
         )?;
         sqlite_obj.set("execute", exec_fn)?;
@@ -348,9 +358,7 @@ fn inject_sqlite<'js>(ctx: &Ctx<'js>, host: &Object<'js>, plugin_dir: &PathBuf) 
             move |db_path_str: String, sql: String, params_json: Option<String>| -> String {
                 let path = resolve_db_path(&db_path_str, &default_db);
                 let result = sqlite_query(&path, &sql, params_json.as_deref());
-                result.unwrap_or_else(|e| {
-                    serde_json::json!({"error": e.to_string()}).to_string()
-                })
+                result.unwrap_or_else(|e| serde_json::json!({"error": e.to_string()}).to_string())
             },
         )?;
         sqlite_obj.set("query", query_fn)?;
@@ -411,7 +419,11 @@ fn json_to_sql_param(v: &JsonValue) -> SqlParam {
     }
 }
 
-fn sqlite_execute(db_path: &PathBuf, sql: &str, params_json: Option<&str>) -> anyhow::Result<String> {
+fn sqlite_execute(
+    db_path: &PathBuf,
+    sql: &str,
+    params_json: Option<&str>,
+) -> anyhow::Result<String> {
     use rusqlite::Connection;
     let conn = Connection::open(db_path)?;
     let params = parse_params(params_json)?;
@@ -421,7 +433,7 @@ fn sqlite_execute(db_path: &PathBuf, sql: &str, params_json: Option<&str>) -> an
 }
 
 fn sqlite_query(db_path: &PathBuf, sql: &str, params_json: Option<&str>) -> anyhow::Result<String> {
-    use rusqlite::{Connection, types::ValueRef};
+    use rusqlite::{types::ValueRef, Connection};
     let conn = Connection::open(db_path)?;
     let params = parse_params(params_json)?;
     let sql_params: Vec<SqlParam> = params.iter().map(json_to_sql_param).collect();
@@ -437,12 +449,11 @@ fn sqlite_query(db_path: &PathBuf, sql: &str, params_json: Option<&str>) -> anyh
                     ValueRef::Real(f) => serde_json::Number::from_f64(f)
                         .map(JsonValue::Number)
                         .unwrap_or(JsonValue::Null),
-                    ValueRef::Text(s) => JsonValue::String(
-                        String::from_utf8_lossy(s).into_owned(),
-                    ),
-                    ValueRef::Blob(b) => JsonValue::String(
-                        base64::Engine::encode(&base64::engine::general_purpose::STANDARD, b),
-                    ),
+                    ValueRef::Text(s) => JsonValue::String(String::from_utf8_lossy(s).into_owned()),
+                    ValueRef::Blob(b) => JsonValue::String(base64::Engine::encode(
+                        &base64::engine::general_purpose::STANDARD,
+                        b,
+                    )),
                 };
                 obj.insert(name.clone(), val);
             }
@@ -470,12 +481,22 @@ fn inject_env<'js>(ctx: &Ctx<'js>, host: &Object<'js>) -> rquickjs::Result<()> {
     let env_obj = Object::new(ctx.clone())?;
 
     const ALLOWED_VARS: &[&str] = &[
-        "HOME", "USER", "USERNAME", "USERPROFILE",
-        "PATH", "SHELL",
-        "XDG_CONFIG_HOME", "XDG_DATA_HOME",
-        "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY",
-        "GOOGLE_API_KEY", "GROQ_API_KEY",
-        "MINIMAX_API_KEY", "MINIMAX_CN_API_KEY", "MINIMAX_CN_SECRET",
+        "HOME",
+        "USER",
+        "USERNAME",
+        "USERPROFILE",
+        "PATH",
+        "SHELL",
+        "XDG_CONFIG_HOME",
+        "XDG_DATA_HOME",
+        "ANTHROPIC_API_KEY",
+        "OPENAI_API_KEY",
+        "GEMINI_API_KEY",
+        "GOOGLE_API_KEY",
+        "GROQ_API_KEY",
+        "MINIMAX_API_KEY",
+        "MINIMAX_CN_API_KEY",
+        "MINIMAX_CN_SECRET",
         "CURSOR_API_KEY",
     ];
 
@@ -537,9 +558,7 @@ fn inject_ccusage<'js>(ctx: &Ctx<'js>, host: &Object<'js>) -> rquickjs::Result<(
                 }
             }
             match cmd.output() {
-                Ok(output) if output.status.success() => {
-                    String::from_utf8(output.stdout).ok()
-                }
+                Ok(output) if output.status.success() => String::from_utf8(output.stdout).ok(),
                 _ => None,
             }
         },

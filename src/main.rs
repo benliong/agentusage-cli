@@ -6,7 +6,7 @@ mod recommendation;
 mod snapshot;
 
 use clap::{Parser, Subcommand};
-use tracing_subscriber::{EnvFilter, fmt};
+use tracing_subscriber::{fmt, EnvFilter};
 
 #[derive(Parser)]
 #[command(

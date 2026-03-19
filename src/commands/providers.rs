@@ -17,7 +17,12 @@ pub fn run() -> Result<()> {
 
     use owo_colors::OwoColorize;
 
-    println!("{:<20} {:<30} {:<12}", "ID".bold(), "Name".bold(), "Configured".bold());
+    println!(
+        "{:<20} {:<30} {:<12}",
+        "ID".bold(),
+        "Name".bold(),
+        "Configured".bold()
+    );
     println!("{}", "─".repeat(64));
 
     for plugin in &plugins {
@@ -28,9 +33,7 @@ pub fn run() -> Result<()> {
         };
         println!(
             "{:<20} {:<30} {}",
-            plugin.manifest.id,
-            plugin.manifest.name,
-            configured
+            plugin.manifest.id, plugin.manifest.name, configured
         );
     }
 

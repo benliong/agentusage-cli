@@ -12,8 +12,7 @@ const APP_NAME: &str = "agentusage";
 /// - Linux:   ~/.local/share/agentusage
 /// - Windows: %APPDATA%\agentusage
 pub fn app_data_dir() -> Result<PathBuf> {
-    let base = dirs::data_dir()
-        .context("could not determine platform data directory")?;
+    let base = dirs::data_dir().context("could not determine platform data directory")?;
     let dir = base.join(APP_NAME);
     fs::create_dir_all(&dir)
         .with_context(|| format!("could not create app data directory: {}", dir.display()))?;
@@ -32,13 +31,11 @@ pub fn plugins_dir() -> Result<PathBuf> {
 pub fn machine_id() -> Result<String> {
     let path = app_data_dir()?.join("machine_id");
     if path.exists() {
-        let id = fs::read_to_string(&path)
-            .context("could not read machine_id")?;
+        let id = fs::read_to_string(&path).context("could not read machine_id")?;
         return Ok(id.trim().to_string());
     }
     let id = Uuid::new_v4().to_string();
-    fs::write(&path, &id)
-        .context("could not write machine_id")?;
+    fs::write(&path, &id).context("could not write machine_id")?;
     Ok(id)
 }
 
@@ -91,8 +88,12 @@ pub fn ensure_bundled_plugins_installed() -> Result<()> {
 
     let target_dir = plugins_dir()?;
 
-    let entries = fs::read_dir(&source_dir)
-        .with_context(|| format!("could not read bundled plugins from {}", source_dir.display()))?;
+    let entries = fs::read_dir(&source_dir).with_context(|| {
+        format!(
+            "could not read bundled plugins from {}",
+            source_dir.display()
+        )
+    })?;
 
     for entry in entries.flatten() {
         let src = entry.path();

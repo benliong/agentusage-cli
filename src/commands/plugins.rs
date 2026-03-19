@@ -64,11 +64,7 @@ fn list() -> Result<()> {
     }
 
     println!();
-    println!(
-        "  {} plugin(s) in {}",
-        plugins.len(),
-        plugins_dir.display()
-    );
+    println!("  {} plugin(s) in {}", plugins.len(), plugins_dir.display());
 
     Ok(())
 }
@@ -99,7 +95,10 @@ fn add(path: &str) -> Result<()> {
     }
 
     copy_dir_recursive(&src, &dst)?;
-    println!("Installed plugin '{}' ({})", plugin.manifest.name, plugin.manifest.id);
+    println!(
+        "Installed plugin '{}' ({})",
+        plugin.manifest.name, plugin.manifest.id
+    );
 
     Ok(())
 }
@@ -114,11 +113,13 @@ fn remove(id: &str) -> Result<()> {
 
     // Sanity check: make sure it has a plugin.json before deleting
     if !target.join("plugin.json").exists() {
-        anyhow::bail!("'{}' does not appear to be a plugin directory", target.display());
+        anyhow::bail!(
+            "'{}' does not appear to be a plugin directory",
+            target.display()
+        );
     }
 
-    fs::remove_dir_all(&target)
-        .with_context(|| format!("could not remove plugin '{id}'"))?;
+    fs::remove_dir_all(&target).with_context(|| format!("could not remove plugin '{id}'"))?;
 
     println!("Removed plugin '{id}'.");
     Ok(())

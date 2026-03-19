@@ -49,7 +49,10 @@ const SCHEMA_VERSION_MAX: u32 = 1;
 /// Each subdirectory is expected to contain a plugin.json + entry JS file.
 pub fn load_plugins(plugins_dir: &PathBuf) -> Vec<LoadedPlugin> {
     let Ok(entries) = fs::read_dir(plugins_dir) else {
-        tracing::warn!("could not read plugins directory: {}", plugins_dir.display());
+        tracing::warn!(
+            "could not read plugins directory: {}",
+            plugins_dir.display()
+        );
         return vec![];
     };
 
@@ -84,13 +87,20 @@ pub fn load_plugin(dir: &PathBuf) -> Result<LoadedPlugin> {
     if manifest.schema_version > SCHEMA_VERSION_MAX {
         tracing::warn!(
             "plugin '{}' uses schemaVersion {} (max supported: {}); loading anyway",
-            manifest.id, manifest.schema_version, SCHEMA_VERSION_MAX
+            manifest.id,
+            manifest.schema_version,
+            SCHEMA_VERSION_MAX
         );
     }
 
     let entry_path = dir.join(&manifest.entry);
-    let script = fs::read_to_string(&entry_path)
-        .with_context(|| format!("could not read entry '{}' in {}", manifest.entry, dir.display()))?;
+    let script = fs::read_to_string(&entry_path).with_context(|| {
+        format!(
+            "could not read entry '{}' in {}",
+            manifest.entry,
+            dir.display()
+        )
+    })?;
 
     Ok(LoadedPlugin {
         manifest,

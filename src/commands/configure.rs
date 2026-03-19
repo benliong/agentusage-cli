@@ -47,7 +47,9 @@ pub fn run(args: ConfigureArgs) -> Result<()> {
         }
 
         _ => {
-            anyhow::bail!("invalid arguments: use --provider and --key together, or --provider and --delete");
+            anyhow::bail!(
+                "invalid arguments: use --provider and --key together, or --provider and --delete"
+            );
         }
     }
 
@@ -55,7 +57,7 @@ pub fn run(args: ConfigureArgs) -> Result<()> {
 }
 
 fn run_interactive() -> Result<()> {
-    use dialoguer::{Select, theme::ColorfulTheme};
+    use dialoguer::{theme::ColorfulTheme, Select};
 
     let plugins_dir = config::plugins_dir()?;
     let plugins = plugin_runtime::load_plugins(&plugins_dir);
@@ -90,7 +92,7 @@ fn run_interactive() -> Result<()> {
 }
 
 fn prompt_provider(provider_id: &str) -> Result<()> {
-    use dialoguer::{Password, theme::ColorfulTheme};
+    use dialoguer::{theme::ColorfulTheme, Password};
 
     let existing = credential::exists(provider_id);
     let prompt = if existing {

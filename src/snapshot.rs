@@ -46,7 +46,13 @@ pub struct UsagePeriod {
 }
 
 impl UsagePeriod {
-    fn from_progress_line(used: f64, limit: f64, format: &Option<ProgressFormat>, resets_at: Option<String>, period_duration_ms: Option<u64>) -> Self {
+    fn from_progress_line(
+        used: f64,
+        limit: f64,
+        format: &Option<ProgressFormat>,
+        resets_at: Option<String>,
+        period_duration_ms: Option<u64>,
+    ) -> Self {
         let remaining_fraction = if limit > 0.0 {
             ((limit - used) / limit).clamp(0.0, 1.0)
         } else {
@@ -54,17 +60,12 @@ impl UsagePeriod {
         };
 
         let (tokens_used, tokens_limit, cost_usd, cost_limit_usd) =
-            match format.as_ref().unwrap_or(&ProgressFormat::Count { suffix: String::new() }) {
-                ProgressFormat::Dollars => (
-                    None, None,
-                    Some(used), Some(limit),
-                ),
-                ProgressFormat::Percent => (
-                    None, None, None, None,
-                ),
-                ProgressFormat::Count { .. } => (
-                    Some(used), Some(limit), None, None,
-                ),
+            match format.as_ref().unwrap_or(&ProgressFormat::Count {
+                suffix: String::new(),
+            }) {
+                ProgressFormat::Dollars => (None, None, Some(used), Some(limit)),
+                ProgressFormat::Percent => (None, None, None, None),
+                ProgressFormat::Count { .. } => (Some(used), Some(limit), None, None),
             };
 
         UsagePeriod {
@@ -114,7 +115,10 @@ pub fn translate(output: &PluginOutput, manifest: &PluginManifest) -> ProviderSn
 
     // Detect not-configured via error badge ONLY when there are no progress lines.
     // (A red badge alongside real progress data is valid — e.g. "Rate limited" warning.)
-    let has_progress = output.lines.iter().any(|l| matches!(l, MetricLine::Progress { .. }));
+    let has_progress = output
+        .lines
+        .iter()
+        .any(|l| matches!(l, MetricLine::Progress { .. }));
     if !has_progress {
         let has_error_badge = output.lines.iter().any(|l| {
             matches!(l, MetricLine::Badge { color: Some(c), .. } if c == "#ef4444" || c == "red")
@@ -153,7 +157,16 @@ pub fn translate(output: &PluginOutput, manifest: &PluginManifest) -> ProviderSn
     let mut positional = 0u32;
 
     for line in &output.lines {
-        if let MetricLine::Progress { label, used, limit, format, resets_at, period_duration_ms, .. } = line {
+        if let MetricLine::Progress {
+            label,
+            used,
+            limit,
+            format,
+            resets_at,
+            period_duration_ms,
+            ..
+        } = line
+        {
             positional += 1;
             let order = primary_order_map
                 .get(label.as_str())
@@ -171,16 +184,26 @@ pub fn translate(output: &PluginOutput, manifest: &PluginManifest) -> ProviderSn
     }
 
     let find_period = |order: u32| -> Option<UsagePeriod> {
-        candidates.iter()
+        candidates
+            .iter()
             .find(|c| c.primary_order == order)
-            .map(|c| UsagePeriod::from_progress_line(c.used, c.limit, &c.format, c.resets_at.clone(), c.period_duration_ms))
+            .map(|c| {
+                UsagePeriod::from_progress_line(
+                    c.used,
+                    c.limit,
+                    &c.format,
+                    c.resets_at.clone(),
+                    c.period_duration_ms,
+                )
+            })
     };
 
     let session = find_period(1);
     let weekly = find_period(2);
 
     // Compute recommendation from the most meaningful period
-    let recommendation = session.as_ref()
+    let recommendation = session
+        .as_ref()
         .or(weekly.as_ref())
         .map(|p| {
             if p.remaining_fraction > 0.3 {

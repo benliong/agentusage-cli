@@ -1,6 +1,6 @@
 use anyhow::Result;
-use clap::Args;
 use chrono::Utc;
+use clap::Args;
 use serde::Serialize;
 
 use crate::config;
@@ -131,13 +131,15 @@ pub fn run(args: StatusArgs, verbose: bool) -> Result<()> {
                     id: snap.id.clone(),
                     display_name: snap.display_name.clone(),
                     status: serde_json::to_value(&snap.status)
-                        .ok().and_then(|v| v.as_str().map(|s| s.to_string()))
+                        .ok()
+                        .and_then(|v| v.as_str().map(|s| s.to_string()))
                         .unwrap_or_default(),
                     plan: snap.plan.clone(),
                     session: period_out(&snap.session),
                     weekly: period_out(&snap.weekly),
                     recommendation: serde_json::to_value(&snap.recommendation)
-                        .ok().and_then(|v| v.as_str().map(|s| s.to_string()))
+                        .ok()
+                        .and_then(|v| v.as_str().map(|s| s.to_string()))
                         .unwrap_or_default(),
                 }
             })
@@ -168,7 +170,12 @@ fn print_human(
     use owo_colors::OwoColorize;
 
     for (_, snap) in outputs {
-        if !verbose && matches!(snap.status, snapshot::ProviderStatus::NotConfigured | snapshot::ProviderStatus::Error) {
+        if !verbose
+            && matches!(
+                snap.status,
+                snapshot::ProviderStatus::NotConfigured | snapshot::ProviderStatus::Error
+            )
+        {
             continue;
         }
 
@@ -178,7 +185,9 @@ fn print_human(
             snapshot::ProviderStatus::NotConfigured => "●".bright_black().to_string(),
         };
 
-        let plan_suffix = snap.plan.as_ref()
+        let plan_suffix = snap
+            .plan
+            .as_ref()
             .map(|p| format!(" {}", format!("[{p}]").bright_black()))
             .unwrap_or_default();
 
@@ -197,7 +206,11 @@ fn print_human(
     }
 
     if let Some(rec) = rec {
-        println!("→ Best provider: {} ({})", rec.best_provider.bold(), rec.best_provider_period);
+        println!(
+            "→ Best provider: {} ({})",
+            rec.best_provider.bold(),
+            rec.best_provider_period
+        );
         println!("  {}", rec.reason.bright_black());
     }
 }
@@ -223,7 +236,9 @@ fn print_period(label: &str, period: &snapshot::UsagePeriod) {
         format!("{:.0}% remaining", pct * 100.0)
     };
 
-    let reset_str = period.resets_at.as_deref()
+    let reset_str = period
+        .resets_at
+        .as_deref()
         .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
         .map(|reset_time| {
             let delta = reset_time.signed_duration_since(Utc::now());
@@ -262,21 +277,33 @@ fn print_period(label: &str, period: &snapshot::UsagePeriod) {
     });
 
     let mut annotations = Vec::new();
-    if let Some(s) = reset_str { annotations.push(s); }
-    if let Some(s) = runs_out_str { if !s.is_empty() { annotations.push(s); } }
+    if let Some(s) = reset_str {
+        annotations.push(s);
+    }
+    if let Some(s) = runs_out_str {
+        if !s.is_empty() {
+            annotations.push(s);
+        }
+    }
     let annotation = if annotations.is_empty() {
         String::new()
     } else {
         format!("  {}", annotations.join("  ").bright_black())
     };
 
-    println!("{label}: {color_bar} {:.0}%  {}{annotation}", pct * 100.0, usage_str.bright_black());
+    println!(
+        "{label}: {color_bar} {:.0}%  {}{annotation}",
+        pct * 100.0,
+        usage_str.bright_black()
+    );
 }
 
 /// Compute the ISO 8601 timestamp when usage will be exhausted at the current burn rate.
 /// Returns None if there's no usage yet, no period info, or the period outlasts the reset.
 fn compute_runs_out_at(period: &snapshot::UsagePeriod) -> Option<String> {
-    let resets_at = period.resets_at.as_deref()
+    let resets_at = period
+        .resets_at
+        .as_deref()
         .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())?;
     let period_ms = period.period_duration_ms? as f64;
 
@@ -285,7 +312,9 @@ fn compute_runs_out_at(period: &snapshot::UsagePeriod) -> Option<String> {
         return None; // no usage yet, can't project
     }
 
-    let time_until_reset_ms = resets_at.signed_duration_since(Utc::now()).num_milliseconds() as f64;
+    let time_until_reset_ms = resets_at
+        .signed_duration_since(Utc::now())
+        .num_milliseconds() as f64;
     let time_elapsed_ms = period_ms - time_until_reset_ms;
     if time_elapsed_ms <= 0.0 {
         return None; // period just started
@@ -314,12 +343,19 @@ fn print_markdown(outputs: &[(plugin_runtime::LoadedPlugin, snapshot::ProviderSn
     println!("|----------|--------|-------------------|-----------------|");
     for (_, snap) in outputs {
         let status = format!("{:?}", snap.status).to_lowercase();
-        let session_pct = snap.session.as_ref()
+        let session_pct = snap
+            .session
+            .as_ref()
             .map(|p| format!("{:.0}%", p.remaining_fraction * 100.0))
             .unwrap_or_else(|| "—".to_string());
-        let weekly_pct = snap.weekly.as_ref()
+        let weekly_pct = snap
+            .weekly
+            .as_ref()
             .map(|p| format!("{:.0}%", p.remaining_fraction * 100.0))
             .unwrap_or_else(|| "—".to_string());
-        println!("| {} | {} | {} | {} |", snap.display_name, status, session_pct, weekly_pct);
+        println!(
+            "| {} | {} | {} | {} |",
+            snap.display_name, status, session_pct, weekly_pct
+        );
     }
 }

@@ -21,7 +21,8 @@ pub fn read(provider_id: &str) -> Result<Option<String>> {
     match entry.get_password() {
         Ok(password) => Ok(Some(password)),
         Err(keyring::Error::NoEntry) => Ok(None),
-        Err(e) => Err(e).with_context(|| format!("could not read credential for provider '{provider_id}'")),
+        Err(e) => Err(e)
+            .with_context(|| format!("could not read credential for provider '{provider_id}'")),
     }
 }
 
@@ -32,7 +33,8 @@ pub fn delete(provider_id: &str) -> Result<()> {
     match entry.delete_credential() {
         Ok(()) => Ok(()),
         Err(keyring::Error::NoEntry) => Ok(()), // already gone
-        Err(e) => Err(e).with_context(|| format!("could not delete credential for provider '{provider_id}'")),
+        Err(e) => Err(e)
+            .with_context(|| format!("could not delete credential for provider '{provider_id}'")),
     }
 }
 
