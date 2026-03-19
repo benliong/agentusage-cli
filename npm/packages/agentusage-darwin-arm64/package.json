@@ -1,0 +1,9 @@
+{
+  "name": "@agentusage/cli-darwin-arm64",
+  "version": "0.1.0",
+  "description": "AgentUsage CLI binary for macOS (Apple Silicon)",
+  "license": "MIT",
+  "os": ["darwin"],
+  "cpu": ["arm64"],
+  "bin": {}
+}

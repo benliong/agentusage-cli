@@ -1,0 +1,9 @@
+{
+  "name": "@agentusage/cli-darwin-x64",
+  "version": "0.1.0",
+  "description": "AgentUsage CLI binary for macOS (Intel)",
+  "license": "MIT",
+  "os": ["darwin"],
+  "cpu": ["x64"],
+  "bin": {}
+}

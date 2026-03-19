@@ -1,0 +1,8 @@
+The plugins in this directory are derived from or identical to plugins in the
+robinebers/openusage project (https://github.com/robinebers/openusage).
+
+Original authors: Robin Ebers and contributors
+License: See https://github.com/robinebers/openusage/blob/main/LICENSE
+
+AgentUsage maintains compatibility with the robinebers/openusage JS plugin format.
+New providers added to either project automatically work in both.

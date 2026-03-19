@@ -1,0 +1,23 @@
+{
+  "name": "agentusage",
+  "version": "0.1.0",
+  "description": "AI provider usage monitor — agent skill for model selection",
+  "homepage": "https://agentusage.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/agentusage-team/agentusage-cli"
+  },
+  "license": "MIT",
+  "bin": {
+    "au": "bin/au.js"
+  },
+  "optionalDependencies": {
+    "@agentusage/cli-darwin-arm64": "0.1.0",
+    "@agentusage/cli-darwin-x64": "0.1.0",
+    "@agentusage/cli-linux-x64": "0.1.0",
+    "@agentusage/cli-win32-x64": "0.1.0"
+  },
+  "engines": {
+    "node": ">=16"
+  }
+}

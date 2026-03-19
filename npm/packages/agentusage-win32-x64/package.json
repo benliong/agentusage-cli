@@ -1,0 +1,9 @@
+{
+  "name": "@agentusage/cli-win32-x64",
+  "version": "0.1.0",
+  "description": "AgentUsage CLI binary for Windows (x86_64)",
+  "license": "MIT",
+  "os": ["win32"],
+  "cpu": ["x64"],
+  "bin": {}
+}

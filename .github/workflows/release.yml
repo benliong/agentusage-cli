@@ -1,0 +1,231 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build (${{ matrix.target }})
+    strategy:
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            binary: au
+            archive_ext: .tar.gz
+
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            binary: au
+            archive_ext: .tar.gz
+
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-22.04
+            binary: au
+            archive_ext: .tar.gz
+
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            binary: au.exe
+            archive_ext: .zip
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          key: release-${{ matrix.target }}
+
+      - name: Install system deps (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y llvm-dev libclang-dev clang
+
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Package (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          VERSION="${{ github.ref_name }}"
+          cp target/${{ matrix.target }}/release/au au
+          cp -r bundled_plugins bundled_plugins_pkg
+          tar czf au-${VERSION}-${{ matrix.target }}.tar.gz au bundled_plugins_pkg
+          mv au-${VERSION}-${{ matrix.target }}.tar.gz au-${VERSION}-${{ matrix.target }}.tar.gz
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $VERSION = "${{ github.ref_name }}"
+          Copy-Item "target\${{ matrix.target }}\release\au.exe" "au.exe"
+          Copy-Item -Recurse "bundled_plugins" "bundled_plugins_pkg"
+          Compress-Archive -Path "au.exe","bundled_plugins_pkg" -DestinationPath "au-${VERSION}-${{ matrix.target }}.zip"
+
+      - name: Upload release asset (Unix)
+        if: runner.os != 'Windows'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: au-${{ github.ref_name }}-${{ matrix.target }}.tar.gz
+
+      - name: Upload release asset (Windows)
+        if: runner.os == 'Windows'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: au-${{ github.ref_name }}-${{ matrix.target }}.zip
+
+  homebrew-tap-bump:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download macOS assets and compute SHA256
+        run: |
+          VERSION="${{ github.ref_name }}"
+          BASE="https://github.com/${{ github.repository }}/releases/download/${VERSION}"
+          ARM64_URL="${BASE}/au-${VERSION}-aarch64-apple-darwin.tar.gz"
+          X86_URL="${BASE}/au-${VERSION}-x86_64-apple-darwin.tar.gz"
+
+          curl -fL "$ARM64_URL" -o arm64.tar.gz
+          curl -fL "$X86_URL"   -o x86.tar.gz
+
+          echo "ARM64_SHA=$(shasum -a 256 arm64.tar.gz | cut -d' ' -f1)" >> $GITHUB_ENV
+          echo "X86_SHA=$(shasum -a 256 x86.tar.gz | cut -d' ' -f1)"     >> $GITHUB_ENV
+          echo "VERSION_PLAIN=${VERSION#v}"                                >> $GITHUB_ENV
+          echo "VERSION_TAG=${VERSION}"                                    >> $GITHUB_ENV
+
+      - name: Checkout homebrew-tap
+        uses: actions/checkout@v4
+        with:
+          repository: agentusage-team/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: homebrew-tap
+
+      - name: Update formula
+        working-directory: homebrew-tap
+        run: |
+          python3 - <<'PYEOF'
+          import re, os
+
+          version = os.environ['VERSION_PLAIN']
+          arm64_sha = os.environ['ARM64_SHA']
+          x86_sha   = os.environ['X86_SHA']
+          version_tag = os.environ['VERSION_TAG']
+          repo = os.environ.get('GITHUB_REPOSITORY', 'agentusage-team/agentusage-cli')
+
+          with open('Formula/agentusage.rb', 'r') as f:
+              content = f.read()
+
+          # Update version
+          content = re.sub(r'version ".*?"', f'version "{version}"', content)
+
+          # Update arm64 sha256 and url
+          content = re.sub(
+              r'(aarch64-apple-darwin.*?sha256 ").*?(")',
+              lambda m: m.group(0).replace(m.group(0).split('"')[-2], arm64_sha),
+              content, flags=re.DOTALL
+          )
+          # Update x86 sha256
+          content = re.sub(
+              r'(x86_64-apple-darwin.*?sha256 ").*?(")',
+              lambda m: m.group(0).replace(m.group(0).split('"')[-2], x86_sha),
+              content, flags=re.DOTALL
+          )
+
+          with open('Formula/agentusage.rb', 'w') as f:
+              f.write(content)
+          PYEOF
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/agentusage.rb
+          git diff --staged --quiet || git commit -m "agentusage ${{ env.VERSION_PLAIN }}"
+          git push
+
+  npm-publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Download all release assets
+        run: |
+          VERSION="${{ github.ref_name }}"
+          BASE="https://github.com/${{ github.repository }}/releases/download/${VERSION}"
+          mkdir -p npm_assets
+
+          curl -fL "${BASE}/au-${VERSION}-aarch64-apple-darwin.tar.gz" -o npm_assets/darwin-arm64.tar.gz
+          curl -fL "${BASE}/au-${VERSION}-x86_64-apple-darwin.tar.gz"  -o npm_assets/darwin-x64.tar.gz
+          curl -fL "${BASE}/au-${VERSION}-x86_64-unknown-linux-gnu.tar.gz" -o npm_assets/linux-x64.tar.gz
+          curl -fL "${BASE}/au-${VERSION}-x86_64-pc-windows-msvc.zip"  -o npm_assets/win32-x64.zip
+
+      - name: Extract and stage npm packages
+        run: |
+          VERSION_PLAIN="${{ github.ref_name }}"
+          VERSION_PLAIN="${VERSION_PLAIN#v}"
+
+          # Extract darwin-arm64
+          mkdir -p npm/packages/agentusage-darwin-arm64/bin
+          tar -xzf npm_assets/darwin-arm64.tar.gz -C /tmp/
+          cp /tmp/au npm/packages/agentusage-darwin-arm64/bin/au
+          cp -r /tmp/bundled_plugins_pkg npm/packages/agentusage-darwin-arm64/bundled_plugins
+
+          # Extract darwin-x64
+          mkdir -p npm/packages/agentusage-darwin-x64/bin
+          tar -xzf npm_assets/darwin-x64.tar.gz -C /tmp/ --strip-components=0 2>/dev/null || true
+          tar -xzf npm_assets/darwin-x64.tar.gz -C /tmp/x64/
+          cp /tmp/x64/au npm/packages/agentusage-darwin-x64/bin/au
+
+          # Extract linux-x64
+          mkdir -p npm/packages/agentusage-linux-x64/bin
+          tar -xzf npm_assets/linux-x64.tar.gz -C /tmp/linux/
+          cp /tmp/linux/au npm/packages/agentusage-linux-x64/bin/au
+
+          # Extract win32-x64
+          mkdir -p npm/packages/agentusage-win32-x64/bin
+          unzip npm_assets/win32-x64.zip -d /tmp/win32/
+          cp /tmp/win32/au.exe npm/packages/agentusage-win32-x64/bin/au.exe
+
+          # Set version in all package.json files
+          for pkg in npm/packages/*/; do
+            jq ".version = \"${VERSION_PLAIN}\"" "${pkg}package.json" > /tmp/pkg.json
+            mv /tmp/pkg.json "${pkg}package.json"
+          done
+          jq ".version = \"${VERSION_PLAIN}\"" npm/package.json > /tmp/root.json
+          mv /tmp/root.json npm/package.json
+
+          # Update optionalDependencies versions
+          jq ".optionalDependencies = (.optionalDependencies | to_entries | map(.value = \"${VERSION_PLAIN}\") | from_entries)" \
+            npm/package.json > /tmp/root2.json
+          mv /tmp/root2.json npm/package.json
+
+          chmod +x npm/packages/agentusage-darwin-arm64/bin/au || true
+          chmod +x npm/packages/agentusage-darwin-x64/bin/au   || true
+          chmod +x npm/packages/agentusage-linux-x64/bin/au    || true
+
+      - name: Publish platform packages
+        run: |
+          for pkg in npm/packages/*/; do
+            npm publish "${pkg}" --access public
+          done
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish root package
+        run: npm publish npm/ --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
