@@ -73,7 +73,6 @@ pub fn compute(snapshots: &[ProviderSnapshot]) -> Option<RecommendationBlock> {
     });
 
     let winner = candidates.first()?;
-    let pct = (winner.remaining_fraction * 100.0).round() as u32;
     let reason = format!(
         "highest remaining_fraction ({:.0}%) with sufficient headroom",
         winner.remaining_fraction * 100.0

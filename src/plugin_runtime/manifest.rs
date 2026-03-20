@@ -1,5 +1,5 @@
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
@@ -76,7 +76,7 @@ pub fn load_plugins(plugins_dir: &PathBuf) -> Vec<LoadedPlugin> {
 }
 
 /// Load a single plugin from a directory.
-pub fn load_plugin(dir: &PathBuf) -> Result<LoadedPlugin> {
+pub fn load_plugin(dir: &Path) -> Result<LoadedPlugin> {
     let manifest_path = dir.join("plugin.json");
     let manifest_str = fs::read_to_string(&manifest_path)
         .with_context(|| format!("missing plugin.json in {}", dir.display()))?;
@@ -104,7 +104,7 @@ pub fn load_plugin(dir: &PathBuf) -> Result<LoadedPlugin> {
 
     Ok(LoadedPlugin {
         manifest,
-        dir: dir.clone(),
+        dir: dir.to_path_buf(),
         script,
     })
 }

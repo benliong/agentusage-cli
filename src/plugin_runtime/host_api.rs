@@ -1,17 +1,13 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-use rquickjs::{prelude::Rest, Ctx, Function, Object, Value};
+use rquickjs::{prelude::Rest, Ctx, Function, Object};
 use serde_json::Value as JsonValue;
 
 /// Inject the full `__openusage_ctx` host API object into the QuickJS context.
 ///
 /// This implements the same contract as robinebers/openusage's plugin_engine/host_api.rs,
 /// minus the Tauri-specific imports. The keychain uses the `keyring` crate directly.
-pub fn inject<'js>(
-    ctx: &Ctx<'js>,
-    plugin_dir: &PathBuf,
-    app_version: &str,
-) -> rquickjs::Result<()> {
+pub fn inject<'js>(ctx: &Ctx<'js>, plugin_dir: &Path, app_version: &str) -> rquickjs::Result<()> {
     let globals = ctx.globals();
 
     // Build the top-level ctx object
@@ -107,7 +103,7 @@ fn inject_http<'js>(ctx: &Ctx<'js>, host: &Object<'js>) -> rquickjs::Result<()> 
                         .collect();
                     let body = resp.text().unwrap_or_default();
                     serde_json::json!({
-                        "ok": status >= 200 && status < 300,
+                        "ok": (200..300).contains(&status),
                         "status": status,
                         "headers": resp_headers,
                         "body": body,
@@ -179,11 +175,7 @@ fn inject_keychain<'js>(ctx: &Ctx<'js>, host: &Object<'js>) -> rquickjs::Result<
 /// Inject ctx.host.fs
 ///
 /// Sandboxed to the plugin's data directory.
-fn inject_fs<'js>(
-    ctx: &Ctx<'js>,
-    host: &Object<'js>,
-    plugin_dir: &PathBuf,
-) -> rquickjs::Result<()> {
+fn inject_fs<'js>(ctx: &Ctx<'js>, host: &Object<'js>, plugin_dir: &Path) -> rquickjs::Result<()> {
     let fs_obj = Object::new(ctx.clone())?;
     let data_dir = plugin_dir.join("data");
     std::fs::create_dir_all(&data_dir).ok();
@@ -298,7 +290,7 @@ fn inject_fs<'js>(
 }
 
 /// Resolve a path for readText/exists: expands ~/, allows absolute /, or sandboxes to data_dir.
-fn resolve_path(path: &str, data_dir: &PathBuf) -> Option<PathBuf> {
+fn resolve_path(path: &str, data_dir: &Path) -> Option<PathBuf> {
     if let Some(rel) = path.strip_prefix("~/") {
         let home = std::env::var("HOME").ok()?;
         Some(PathBuf::from(home).join(rel))
@@ -331,7 +323,7 @@ fn sanitize_path(path: &str) -> Option<String> {
 fn inject_sqlite<'js>(
     ctx: &Ctx<'js>,
     host: &Object<'js>,
-    plugin_dir: &PathBuf,
+    plugin_dir: &Path,
 ) -> rquickjs::Result<()> {
     let sqlite_obj = Object::new(ctx.clone())?;
     let default_db_path = plugin_dir.join("data").join("plugin.db");
@@ -368,9 +360,9 @@ fn inject_sqlite<'js>(
     Ok(())
 }
 
-fn resolve_db_path(db_path_str: &str, default_db: &PathBuf) -> PathBuf {
+fn resolve_db_path(db_path_str: &str, default_db: &Path) -> PathBuf {
     if db_path_str.is_empty() {
-        default_db.clone()
+        default_db.to_path_buf()
     } else if let Some(rel) = db_path_str.strip_prefix("~/") {
         let home = std::env::var("HOME").unwrap_or_default();
         PathBuf::from(home).join(rel)
@@ -385,6 +377,7 @@ enum SqlParam {
     Int(i64),
     Real(f64),
     Text(String),
+    #[allow(dead_code)]
     Blob(Vec<u8>),
 }
 
