@@ -34,9 +34,9 @@ jobs:
         with:
           key: ci-${{ matrix.target }}
 
-      - name: Install LLVM (for rquickjs bindgen)
+      - name: Install Linux dependencies
         if: runner.os == 'Linux'
-        run: sudo apt-get install -y llvm-dev libclang-dev clang
+        run: sudo apt-get install -y llvm-dev libclang-dev clang libdbus-1-dev pkg-config
 
       - name: fmt
         run: cargo fmt --check
