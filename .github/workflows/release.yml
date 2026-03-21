@@ -54,7 +54,7 @@ jobs:
 
       - name: Install system deps (Linux)
         if: runner.os == 'Linux'
-        run: sudo apt-get install -y llvm-dev libclang-dev clang
+        run: sudo apt-get install -y llvm-dev libclang-dev clang libdbus-1-dev pkg-config
 
       - name: Build
         run: cargo build --release --target ${{ matrix.target }}
