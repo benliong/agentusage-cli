@@ -78,6 +78,24 @@ pub fn bundled_plugins_source_dir() -> Option<PathBuf> {
     None
 }
 
+/// Returns the best directory to load plugins from.
+/// Uses the user plugins dir if it contains at least one installed plugin,
+/// otherwise falls back to the bundled source dir — so `au` works zero-config
+/// (e.g. in Docker or CI, without needing a first-run install step).
+pub fn effective_plugins_dir() -> Result<PathBuf> {
+    let user_dir = plugins_dir()?;
+    let has_installed = fs::read_dir(&user_dir)
+        .ok()
+        .map(|entries| entries.flatten().any(|e| e.path().is_dir()))
+        .unwrap_or(false);
+    if !has_installed {
+        if let Some(bundled) = bundled_plugins_source_dir() {
+            return Ok(bundled);
+        }
+    }
+    Ok(user_dir)
+}
+
 /// Ensures all bundled plugins are copied to the plugins data dir on first run.
 /// Skips plugins that already exist in the target dir.
 pub fn ensure_bundled_plugins_installed() -> Result<()> {

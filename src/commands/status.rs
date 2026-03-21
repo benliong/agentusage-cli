@@ -69,7 +69,7 @@ struct PeriodOutput {
 pub fn run(args: StatusArgs, verbose: bool) -> Result<()> {
     config::ensure_bundled_plugins_installed()?;
 
-    let plugins_dir = config::plugins_dir()?;
+    let plugins_dir = config::effective_plugins_dir()?;
     let machine_id = config::machine_id()?;
 
     let mut plugins = plugin_runtime::load_plugins(&plugins_dir);

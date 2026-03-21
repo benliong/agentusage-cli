@@ -36,7 +36,7 @@ pub fn run(cmd: PluginsCommand) -> Result<()> {
 fn list() -> Result<()> {
     use owo_colors::OwoColorize;
 
-    let plugins_dir = config::plugins_dir()?;
+    let plugins_dir = config::effective_plugins_dir()?;
     let plugins = plugin_runtime::load_plugins(&plugins_dir);
 
     if plugins.is_empty() {
