@@ -69,7 +69,6 @@ jobs:
           cp target/${{ matrix.target }}/release/au au
           cp -r bundled_plugins bundled_plugins_pkg
           tar czf au-${VERSION}-${{ matrix.target }}.tar.gz au bundled_plugins_pkg
-          mv au-${VERSION}-${{ matrix.target }}.tar.gz au-${VERSION}-${{ matrix.target }}.tar.gz
 
       - name: Package (Windows)
         if: runner.os == 'Windows'
