@@ -94,6 +94,7 @@ jobs:
   homebrew-tap-bump:
     needs: build
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - name: Download macOS assets and compute SHA256
         run: |
@@ -161,6 +162,7 @@ jobs:
   npm-publish:
     needs: build
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
@@ -186,24 +188,23 @@ jobs:
           VERSION_PLAIN="${VERSION_PLAIN#v}"
 
           # Extract darwin-arm64
-          mkdir -p npm/packages/agentusage-darwin-arm64/bin
-          tar -xzf npm_assets/darwin-arm64.tar.gz -C /tmp/
-          cp /tmp/au npm/packages/agentusage-darwin-arm64/bin/au
-          cp -r /tmp/bundled_plugins_pkg npm/packages/agentusage-darwin-arm64/bundled_plugins
+          mkdir -p npm/packages/agentusage-darwin-arm64/bin /tmp/arm64
+          tar -xzf npm_assets/darwin-arm64.tar.gz -C /tmp/arm64/
+          cp /tmp/arm64/au npm/packages/agentusage-darwin-arm64/bin/au
+          cp -r /tmp/arm64/bundled_plugins_pkg npm/packages/agentusage-darwin-arm64/bundled_plugins
 
           # Extract darwin-x64
-          mkdir -p npm/packages/agentusage-darwin-x64/bin
-          tar -xzf npm_assets/darwin-x64.tar.gz -C /tmp/ --strip-components=0 2>/dev/null || true
+          mkdir -p npm/packages/agentusage-darwin-x64/bin /tmp/x64
           tar -xzf npm_assets/darwin-x64.tar.gz -C /tmp/x64/
           cp /tmp/x64/au npm/packages/agentusage-darwin-x64/bin/au
 
           # Extract linux-x64
-          mkdir -p npm/packages/agentusage-linux-x64/bin
+          mkdir -p npm/packages/agentusage-linux-x64/bin /tmp/linux
           tar -xzf npm_assets/linux-x64.tar.gz -C /tmp/linux/
           cp /tmp/linux/au npm/packages/agentusage-linux-x64/bin/au
 
           # Extract win32-x64
-          mkdir -p npm/packages/agentusage-win32-x64/bin
+          mkdir -p npm/packages/agentusage-win32-x64/bin /tmp/win32
           unzip npm_assets/win32-x64.zip -d /tmp/win32/
           cp /tmp/win32/au.exe npm/packages/agentusage-win32-x64/bin/au.exe
 
