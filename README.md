@@ -34,9 +34,9 @@ Add this to your `CLAUDE.md` (or equivalent) to let your agent pick the best ava
 ```markdown
 ## Model selection
 Before starting any task, run `au status --json` and check `recommendation.best_provider`.
-- remaining_fraction > 0.3 → use claude-opus-4-6
-- remaining_fraction < 0.3 → use claude-sonnet-4-6
-- remaining_fraction < 0.1 → use claude-haiku-4-5-20251001
+- If the current provider is `sufficient`, proceed normally.
+- If it is `low`, shrink scope or split the task into phases.
+- If it is `exhausted`, route to another healthy provider or fall back to an API lane.
 ```
 
 ### JSON output schema
@@ -47,20 +47,81 @@ Before starting any task, run `au status --json` and check `recommendation.best_
   "fetched_at": "2026-03-19T10:00:00Z",
   "providers": [
     {
-      "id": "claude",
-      "display_name": "Claude",
+      "id": "codex",
+      "display_name": "Codex",
       "status": "ok",
-      "lines": [...],
-      "remaining_fraction": 0.55
+      "session": {
+        "remaining_fraction": 0.55,
+        "resets_at": "2026-03-24T19:59:31.000Z"
+      },
+      "weekly": {
+        "remaining_fraction": 0.93,
+        "resets_at": "2026-03-30T10:43:45.000Z"
+      },
+      "recommendation": "sufficient"
     }
   ],
   "recommendation": {
-    "best_provider": "antigravity",
-    "best_provider_period": "session",
-    "reason": "highest remaining fraction (100%) with sufficient headroom"
+    "best_provider": "codex",
+    "best_provider_period": "weekly",
+    "reason": "highest remaining_fraction (93%) with sufficient headroom"
   }
 }
 ```
+
+## Using `au` with OpenClaw
+
+OpenClaw can use `au` as a quota signal before choosing how to run a task. A practical pattern is to wrap `au status --json` in a small helper such as `au-check` and route work at task boundaries instead of trying to hot-swap providers mid-step.
+
+### 1. Pre-task routing
+
+```bash
+au-check route
+# codex_oauth -> use the normal Codex OAuth lane
+# codex_api   -> use an API-backed Codex fallback for this phase
+```
+
+### 2. Provider ranking for delegation
+
+```bash
+au status --json | jq -r '
+  [.providers[] | select(.status == "ok" and .recommendation != "exhausted")]
+  | sort_by(-(.session.remaining_fraction // .weekly.remaining_fraction // 0))
+  | .[].id'
+```
+
+### 3. Avoiding partial work
+
+```bash
+au status --json | jq -r '
+  .providers[] | select(.id == "codex") |
+  {status, recommendation, session: .session.remaining_fraction, resets_at: .session.resets_at}'
+```
+
+If the provider is `low`, split the task into phases. If it is `exhausted`, route the current phase elsewhere.
+
+### 4. Autonomous sessions
+
+Re-check `au` after a checkpoint or before the next major execution phase. If the preferred provider is still exhausted, stay on the fallback lane. If it has recovered, switch back on the next phase.
+
+### 5. User-facing transparency
+
+```bash
+au status --json | jq -r '
+  .providers[]
+  | select(.status == "ok")
+  | "- \(.display_name): \((.session.remaining_fraction // .weekly.remaining_fraction) * 100 | round)% remaining [\(.recommendation | ascii_upcase)]"'
+```
+
+### 6. Quota-aware decomposition
+
+Use `providers[].recommendation` as the planning signal:
+
+- `sufficient` → proceed normally
+- `low` → split into phases and keep the first phase small
+- `exhausted` → switch lanes or defer until reset
+
+Use `providers[].session.resets_at` or `providers[].weekly.resets_at` when you need to explain when quota will recover.
 
 ## Supported providers
 
