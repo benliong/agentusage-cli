@@ -9,7 +9,7 @@ Built for both humans and AI agents. Run `au status --json` as a skill inside Cl
 ## Install
 
 ```sh
-brew install agentusage-team/tap/agentusage
+brew install ForgeRelayAI/tap/agentusage
 ```
 
 Or build from source:

@@ -112,11 +112,18 @@ jobs:
           echo "VERSION_PLAIN=${VERSION#v}"                                >> $GITHUB_ENV
           echo "VERSION_TAG=${VERSION}"                                    >> $GITHUB_ENV
 
+      - uses: actions/create-github-app-token@v1
+        id: tap-token
+        with:
+          app-id: ${{ secrets.TAP_APP_ID }}
+          private-key: ${{ secrets.TAP_APP_PRIVATE_KEY }}
+          repositories: homebrew-tap
+
       - name: Checkout homebrew-tap
         uses: actions/checkout@v4
         with:
-          repository: agentusage-team/homebrew-tap
-          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          repository: ForgeRelayAI/homebrew-tap
+          token: ${{ steps.tap-token.outputs.token }}
           path: homebrew-tap
 
       - name: Update formula
@@ -129,7 +136,7 @@ jobs:
           arm64_sha = os.environ['ARM64_SHA']
           x86_sha   = os.environ['X86_SHA']
           version_tag = os.environ['VERSION_TAG']
-          repo = os.environ.get('GITHUB_REPOSITORY', 'agentusage-team/agentusage-cli')
+          repo = os.environ.get('GITHUB_REPOSITORY', 'ForgeRelayAI/agentusage-cli')
 
           with open('Formula/agentusage.rb', 'r') as f:
               content = f.read()

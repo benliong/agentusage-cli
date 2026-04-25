@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 description = "AI provider usage monitor — agent skill for model selection"
 homepage = "https://agentusage.dev"
-repository = "https://github.com/agentusage-team/agentusage-cli"
+repository = "https://github.com/ForgeRelayAI/agentusage-cli"
 license = "MIT"
 
 [[bin]]

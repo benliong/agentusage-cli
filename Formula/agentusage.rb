@@ -6,10 +6,10 @@ class Agentusage < Formula
 
   on_macos do
     if Hardware::CPU.arm?
-      url "https://github.com/agentusage-team/agentusage-cli/releases/download/v#{version}/au-v#{version}-aarch64-apple-darwin.tar.gz"
+      url "https://github.com/ForgeRelayAI/agentusage-cli/releases/download/v#{version}/au-v#{version}-aarch64-apple-darwin.tar.gz"
       sha256 "PLACEHOLDER_ARM64"
     else
-      url "https://github.com/agentusage-team/agentusage-cli/releases/download/v#{version}/au-v#{version}-x86_64-apple-darwin.tar.gz"
+      url "https://github.com/ForgeRelayAI/agentusage-cli/releases/download/v#{version}/au-v#{version}-x86_64-apple-darwin.tar.gz"
       sha256 "PLACEHOLDER_X86"
     end
   end

@@ -5,7 +5,7 @@
   "homepage": "https://agentusage.dev",
   "repository": {
     "type": "git",
-    "url": "https://github.com/agentusage-team/agentusage-cli"
+    "url": "https://github.com/ForgeRelayAI/agentusage-cli"
   },
   "license": "MIT",
   "bin": {
